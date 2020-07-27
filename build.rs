@@ -97,11 +97,17 @@ fn build_x264() {
     let mut prefix_arg = OsString::from("--prefix=");
     prefix_arg.push(&install_prefix());
 
+    let path = env::var("PATH").expect("PATH to be set");
+
     let result = Command::new("bash")
         .arg("configure")
         .arg(prefix_arg)
         .arg("--disable-cli")
         .arg("--enable-static")
+        // need to manually set PATH to make libstd think that the env has
+        // changed in order to trigger the right path search logic
+        // https://github.com/rust-lang/rust/issues/37519
+        .env("PATH", &path)
         .current_dir(&source_path)
         .status()
         .unwrap();
@@ -115,6 +121,10 @@ fn build_x264() {
         .arg(num_cpus::get().to_string())
         .arg("all")
         .arg("install")
+        // need to manually set PATH to make libstd think that the env has
+        // changed in order to trigger the right path search logic
+        // https://github.com/rust-lang/rust/issues/37519
+        .env("PATH", &path)
         .current_dir(&source_path)
         .status()
         .unwrap();
