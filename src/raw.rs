@@ -3,4 +3,4 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 
-include!(concat!(env!("OUT_DIR"), "/bindings_x264.rs"));
+include!("bindings_x264.rs");

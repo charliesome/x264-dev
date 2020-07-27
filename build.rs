@@ -6,8 +6,6 @@ use std::ffi::OsString;
 use std::path::{PathBuf, Path};
 use std::process::Command;
 use std::string::ToString;
-use tar::Archive;
-use flate2::read::GzDecoder;
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -33,7 +31,7 @@ fn out_dir() -> PathBuf {
 }
 
 fn source_path() -> PathBuf {
-    out_dir().join("x264-stable")
+    env::current_dir().unwrap().join("x264-stable")
 }
 
 fn install_prefix() -> PathBuf {
@@ -43,28 +41,6 @@ fn install_prefix() -> PathBuf {
 ///////////////////////////////////////////////////////////////////////////////
 // UTILS - BUILD
 ///////////////////////////////////////////////////////////////////////////////
-
-pub fn extract_tar_file<P: AsRef<Path>, Q: AsRef<Path>>(tar_file: P, dest: Q) -> Result<(), String> {
-    let source = std::fs::read(tar_file).expect("read tar file");
-    let tar = GzDecoder::new(&source[..]);
-    let mut archive = Archive::new(tar);
-    // UNPACK ARCHIVE
-    let tmp_source_dir: Option<PathBuf> = {
-        archive
-            .unpack(&dest)
-            .map_err(|x| format!("[{:?}] failed to unpack tar file: {:?}", dest.as_ref(), x))?;
-        let xs = std::fs::read_dir(&dest)
-            .expect(&format!("unable to read dir {:?}", dest.as_ref()))
-            .filter_map(Result::ok)
-            .filter(|file| file.file_type().map(|x| x.is_dir()).unwrap_or(false))
-            .collect::<Vec<std::fs::DirEntry>>();
-        match &xs[..] {
-            [x] => Some(x.path()),
-            _ => None,
-        }
-    };
-    Ok(())
-}
 
 pub fn lookup_newest(paths: Vec<PathBuf>) -> Option<PathBuf> {
     use std::time::{SystemTime, Duration};
@@ -165,17 +141,12 @@ pub const STATIC_LIBS: &[(&str, &str)] = &[
     ("x264", "./libx264.a"),
 ];
 
-pub const HEADERS: &[&str] = &[
-    "x264.h",
-];
-
 ///////////////////////////////////////////////////////////////////////////////
 // BUILD PIPELINE
 ///////////////////////////////////////////////////////////////////////////////
 
 fn build() {
     // SETUP
-    extract_tar_file("archive/x264-stable.tar.gz", &out_dir());
     assert!(source_path().exists());
     // BUILD
     build_x264();
@@ -186,27 +157,6 @@ fn build() {
     for (name, _) in STATIC_LIBS {
         println!("cargo:rustc-link-lib=static={}", name);
     }
-    // CODEGEN
-    let codegen = |file_name: &str, headers: &[&str]| {
-        let codegen = bindgen::Builder::default();
-        let codegen = codegen.header("include/prelude.h");
-        let codegen = headers
-            .iter()
-            .fold(codegen, |codegen: bindgen::Builder, path: &&str| -> bindgen::Builder {
-                let path: &str = path.clone();
-                let path: PathBuf = install_prefix().join("include").join(path);
-                let path: &str = path.to_str().expect("PathBuf to str");
-                assert!(PathBuf::from(path).exists());
-                codegen.header(path)
-            });
-        codegen
-            .generate_comments(true)
-            .generate()
-            .expect("Unable to generate bindings")
-            .write_to_file(out_dir().join(file_name))
-            .expect("Couldn't write bindings!");
-    };
-    codegen("bindings_x264.rs", HEADERS);
     // CARGO METADATA
     println!("cargo:libs={}", install_prefix().join("lib").to_str().unwrap());
     println!("cargo:pkgconfig={}", install_prefix().join("lib").join("pkgconfig").to_str().unwrap());
