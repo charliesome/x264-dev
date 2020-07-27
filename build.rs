@@ -134,16 +134,14 @@ fn cpy<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// PATHS
-///////////////////////////////////////////////////////////////////////////////
-
-pub const STATIC_LIBS: &[(&str, &str)] = &[
-    ("x264", "./libx264.a"),
-];
-
-///////////////////////////////////////////////////////////////////////////////
 // BUILD PIPELINE
 ///////////////////////////////////////////////////////////////////////////////
+
+#[cfg(target_family = "unix")]
+const X264_LINK_NAME: &'static str = "x264";
+
+#[cfg(target_family = "windows")]
+const X264_LINK_NAME: &'static str = "libx264";
 
 fn build() {
     // SETUP
@@ -154,9 +152,10 @@ fn build() {
     println!("cargo:rustc-link-search=native={}", {
         install_prefix().join("lib").to_str().unwrap()
     });
-    for (name, _) in STATIC_LIBS {
-        println!("cargo:rustc-link-lib=static={}", name);
-    }
+
+
+    println!("cargo:rustc-link-lib=static={}", X264_LINK_NAME);
+
     // CARGO METADATA
     println!("cargo:libs={}", install_prefix().join("lib").to_str().unwrap());
     println!("cargo:pkgconfig={}", install_prefix().join("lib").join("pkgconfig").to_str().unwrap());
